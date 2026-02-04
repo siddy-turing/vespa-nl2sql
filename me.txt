@@ -1,0 +1,81 @@
+Meeting notes Jan 29, 2026:
+Legend Models:
+Data Structures
+Properties
+Constrains
+Mapping to Physical Data
+Executable Logic
+What does the semantic router think are the best models to invoke when routing.
+      
+Legend Metadata:
+One node on Vespa can store:
+Data Product
+Root Entity
+Entity
+Query
+Property
+Aliases were extracted from previous queries
+In pure they are stored as graph as follows
+Data Product
+Root Entity
+Entity
+Query
+Property
+Since aliases come from historical queries, how do we prevent drift or bias toward legacy terms?
+Vespa versioning happens on 24 hours basis.
+BGE M3 1024 dimensions, 8K Tokens
+Ranking: Semantic Matches (Runs only on description), Lexical Search BM25 (runs on aliases)
+
+Team Notes:
+Marawan Youssef:
+I’m thinking about version churn: if we refresh every 24 hours, should we cache embeddings per node version and track semantic drift over time, so we can spot when a property’s meaning shifts and trigger revalidation?
+For properties that appear in multiple entities, could we learn a small routing model that uses features like path depth, alias freshness, and join cardinality to pick the best context, and fall back to a clarifying question when scores tie?
+Since they store enums and primitive types, could we add type-aware boosts in ranking and query gen, so date and numeric filters get priority when present, and enum values expand into safe synonyms without overmatching?
+
+Meeting Transcript + Notes:
+Vespa Vector Store Architecture
+BGE M3 embedding model with 1024 dimensions, 8K token context length
+Hybrid ranking approach combining semantic search and BM25 lexical search
+Semantic search runs on generated descriptions only
+Lexical search runs on aliases extracted from historical queries
+24-hour refresh cycle for all ingested data to prevent legacy term drift
+Tree structure representation (not graph) to avoid cycles
+Each node has single parent, multiple children relationships
+Separate nodes created when properties overlap across entities
+Data Model & Metadata Schema
+Four-tier hierarchy: Data Product → Root Entity → Entity → Property
+Data Product = cluster (SQL equivalent)
+Root Entity = database within cluster
+Entity = tables within database
+Property = columns within tables
+Node types stored with comprehensive metadata:
+Names, descriptions, aliases, parent/child IDs
+Auto-generated 25-30 word descriptions using LLM
+Aliases extracted from historical SQL queries (SELECT AS statements)
+Enum values for categorical properties
+User query schema tracks successful executions
+Natural language questions, generated queries, chosen data products
+User context for access control considerations
+Multi-Stage Semantic Routing Process
+Sequential Vespa calls with LLM re-ranking at each level:
+Data Product identification (filter: node_type = data_product)
+Root Entity selection within chosen data product
+Entity discovery within root entity scope
+Property identification for candidate selection
+Re-ranking uses additional context beyond Vespa scores
+Number of matching entities/properties per data product
+Historical query similarity matching (threshold-based)
+Current accuracy metrics: 85-90% for data product/root entity selection
+Disambiguation layer operates pre and post semantic search
+Pre: Business context extraction (employee IDs, Kerberos identifiers)
+Post: Clarifying questions when confidence scores are close
+Scaling Challenges & Next Steps
+Current deployment: 5 data products, expanding to 15+ in next 3 months
+Key concerns as volume increases:
+Maintaining accuracy with denser vector space
+Cross-product disambiguation for common terms (trades, revenue)
+Many-to-many joins across expanded data products
+End-to-end latency: 20-40 seconds (simple to complex queries)
+Evaluation framework expansion needed with actual business user test cases
+Exploring graph database alternatives (Neo4J) and other embedding models
+
